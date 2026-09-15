@@ -176,6 +176,41 @@ def test_cuda_nan_eval_matches_predict():
     np.testing.assert_allclose(result["internal_logloss"], result["logloss"], rtol=0.5)
 
 
+def test_cuda_multiclass_logloss_matches_predict():
+    """CUDA multi_logloss must agree with the probabilities returned by predict()."""
+    rng = np.random.RandomState(42)
+    X = rng.normal(size=(12_000, 12)).astype(np.float32)
+    logits = X[:, :4] @ rng.normal(size=(4, 4))
+    y = np.argmax(logits + rng.normal(scale=0.75, size=logits.shape), axis=1).astype(np.float32)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    train_set = lgb.Dataset(X_train, label=y_train, free_raw_data=False)
+    valid_set = lgb.Dataset(X_test, label=y_test, reference=train_set, free_raw_data=False)
+    evals_result = {}
+    booster = lgb.train(
+        {
+            "objective": "multiclass",
+            "num_class": 4,
+            "metric": "multi_logloss",
+            "device_type": "cuda",
+            "num_threads": 1,
+            "num_leaves": 15,
+            "learning_rate": 0.1,
+            "verbosity": -1,
+        },
+        train_set,
+        num_boost_round=8,
+        valid_sets=[valid_set],
+        callbacks=[lgb.record_evaluation(evals_result)],
+    )
+    probabilities = booster.predict(X_test)
+    np.testing.assert_allclose(
+        evals_result["valid_0"]["multi_logloss"][-1],
+        log_loss(y_test, probabilities, labels=np.arange(4)),
+        rtol=1e-5,
+        atol=1e-7,
+    )
+
+
 def test_cuda_quantized_nan_and_zero():
     """zeros=0.60 / nans=0.20 so most_freq_bin is 0 (mfb_offset==1) and NaNs are present."""
     X, y = _make_binary_data(n_samples=50_000, n_features=40, zeros=0.60, nans=0.20)
