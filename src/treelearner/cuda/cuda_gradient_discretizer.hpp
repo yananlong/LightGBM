@@ -58,7 +58,10 @@ class CUDAGradientDiscretizer: public GradientDiscretizer, public NCCLInfo {
   void Init(const data_size_t num_data, const int num_leaves,
     const int num_features, const Dataset* train_data) override {
     GradientDiscretizer::Init(num_data, num_leaves, num_features, train_data);
-    discretized_gradients_and_hessians_.Resize(num_data * 2);
+    // The device kernel stores one int16 hessian and one int16 gradient per
+    // row. The vector is byte-addressed (int8_t) because the public API uses
+    // an int8_t pointer, so reserve the full 4 bytes per row here.
+    discretized_gradients_and_hessians_.Resize(static_cast<size_t>(num_data) * 2 * sizeof(int16_t));
     num_reduce_blocks_ = (num_data + CUDA_GRADIENT_DISCRETIZER_BLOCK_SIZE - 1) / CUDA_GRADIENT_DISCRETIZER_BLOCK_SIZE;
     grad_min_block_buffer_.Resize(num_reduce_blocks_);
     grad_max_block_buffer_.Resize(num_reduce_blocks_);
