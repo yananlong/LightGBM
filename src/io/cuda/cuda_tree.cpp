@@ -26,7 +26,7 @@ num_threads_per_block_add_prediction_to_score_(1024) {
   }
   InitCUDAMemory();
   host_leaf_depth_.resize(max_leaves_, -1);
-  host_leaf_depth_[0] = 1;
+  host_leaf_depth_[0] = 0;
 }
 
 CUDATree::CUDATree(const Tree* host_tree):
@@ -57,9 +57,10 @@ void CUDATree::InitCUDAMemory() {
   cuda_leaf_count_.Resize(static_cast<size_t>(max_leaves_));
   cuda_internal_count_.Resize(static_cast<size_t>(max_leaves_));
   cuda_split_gain_.Resize(static_cast<size_t>(max_leaves_));
-  SetCUDAMemory<double>(cuda_leaf_value_.RawData(), 0.0f, 1, __FILE__, __LINE__);
-  SetCUDAMemory<double>(cuda_leaf_weight_.RawData(), 0.0f, 1, __FILE__, __LINE__);
-  SetCUDAMemory<int>(cuda_leaf_parent_.RawData(), -1, 1, __FILE__, __LINE__);
+  CUDASUCCESS_OR_FATAL(cudaMemset(cuda_leaf_value_.RawData(), 0, sizeof(double)));
+  CUDASUCCESS_OR_FATAL(cudaMemset(cuda_leaf_weight_.RawData(), 0, sizeof(double)));
+  CUDASUCCESS_OR_FATAL(cudaMemset(cuda_leaf_depth_.RawData(), 0, sizeof(int)));
+  CUDASUCCESS_OR_FATAL(cudaMemset(cuda_leaf_parent_.RawData(), -1, sizeof(int)));
   CUDASUCCESS_OR_FATAL(cudaStreamCreate(&cuda_stream_));
   SynchronizeCUDADevice(__FILE__, __LINE__);
 }
@@ -93,8 +94,9 @@ int CUDATree::Split(const int leaf_index,
   LaunchSplitKernel(leaf_index, real_feature_index, real_threshold, missing_type, cuda_split_info);
   RecordBranchFeatures(leaf_index, num_leaves_, real_feature_index);
 
-  ++host_leaf_depth_[leaf_index];
-  host_leaf_depth_[num_leaves_] = host_leaf_depth_[leaf_index];
+  const int new_leaf_depth = host_leaf_depth_[leaf_index] + 1;
+  host_leaf_depth_[leaf_index] = new_leaf_depth;
+  host_leaf_depth_[num_leaves_] = new_leaf_depth;
 
   ++num_leaves_;
   return num_leaves_ - 1;
@@ -115,6 +117,9 @@ int CUDATree::SplitCategorical(const int leaf_index,
   cuda_bitset_inner_.PushBack(cuda_bitset_inner, cuda_bitset_inner_len);
   ++num_leaves_;
   ++num_cat_;
+  const int new_leaf_depth = host_leaf_depth_[leaf_index] + 1;
+  host_leaf_depth_[leaf_index] = new_leaf_depth;
+  host_leaf_depth_[num_leaves_ - 1] = new_leaf_depth;
   RecordBranchFeatures(leaf_index, num_leaves_, real_feature_index);
   return num_leaves_ - 1;
 }
