@@ -2132,7 +2132,6 @@ void CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel(
         cuda_leaf_best_split_info_.RawData(),
         false);
     }
-    SynchronizeCUDADevice(__FILE__, __LINE__);
     SyncBestSplitForLeafKernel<<<num_blocks_per_leaf, NUM_TASKS_PER_SYNC_BLOCK, 0, cuda_streams_[1]>>>(
       host_smaller_leaf_index,
       host_larger_leaf_index,
