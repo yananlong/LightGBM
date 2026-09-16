@@ -137,7 +137,7 @@ if ((global_num_data_in_smaller_leaf <= min_data_in_leaf_ || sum_hessians_in_sma
     return;
   }
   LaunchConstructHistogramKernel(cuda_smaller_leaf_splits, num_data_in_smaller_leaf, num_bits_in_histogram_bins);
-  SynchronizeCUDADevice(__FILE__, __LINE__);
+  SynchronizeCUDAStream(cuda_stream_, __FILE__, __LINE__);
 }
 
 void CUDAHistogramConstructor::SubtractHistogramForLeaf(
