@@ -362,7 +362,6 @@ const CUDASplitInfo* CUDABestSplitFinder::FindBestFromAllSplits(
     larger_leaf_best_split_default_left,
     best_leaf_index,
     num_cat_threshold);
-  SynchronizeCUDADevice(__FILE__, __LINE__);
   return cuda_leaf_best_split_info_.RawData() + (*best_leaf_index);
 }
 
