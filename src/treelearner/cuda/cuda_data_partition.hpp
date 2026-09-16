@@ -361,9 +361,16 @@ class CUDADataPartition: public NCCLInfo {
   // CUDA streams
   /*! \brief cuda streams used for asynchronizing kernel computing and memory copy */
   std::vector<cudaStream_t> cuda_streams_;
+  /*! \brief event recorded after aggregate offsets and any NCCL counts are ready */
+  cudaEvent_t split_offsets_ready_event_ = nullptr;
+  /*! \brief event recorded after the split output indices are ready */
+  cudaEvent_t split_inner_ready_event_ = nullptr;
   /*! \brief event recorded after cuda_data_indices_ is refreshed by a split */
   cudaEvent_t data_indices_ready_event_ = nullptr;
+  /*! \brief event recorded after the data-index-to-leaf mapping is refreshed */
+  cudaEvent_t data_index_to_leaf_index_ready_event_ = nullptr;
   bool data_indices_ready_ = false;
+  bool data_index_to_leaf_index_ready_ = false;
 
 
   // CUDA memory, held by this object

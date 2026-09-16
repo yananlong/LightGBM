@@ -54,8 +54,17 @@ CUDADataPartition::CUDADataPartition(
 }
 
 CUDADataPartition::~CUDADataPartition() {
+  if (split_offsets_ready_event_ != nullptr) {
+    CUDASUCCESS_OR_FATAL(cudaEventDestroy(split_offsets_ready_event_));
+  }
+  if (split_inner_ready_event_ != nullptr) {
+    CUDASUCCESS_OR_FATAL(cudaEventDestroy(split_inner_ready_event_));
+  }
   if (data_indices_ready_event_ != nullptr) {
     CUDASUCCESS_OR_FATAL(cudaEventDestroy(data_indices_ready_event_));
+  }
+  if (data_index_to_leaf_index_ready_event_ != nullptr) {
+    CUDASUCCESS_OR_FATAL(cudaEventDestroy(data_index_to_leaf_index_ready_event_));
   }
   CUDASUCCESS_OR_FATAL(cudaStreamDestroy(cuda_streams_[0]));
   CUDASUCCESS_OR_FATAL(cudaStreamDestroy(cuda_streams_[1]));
@@ -91,7 +100,10 @@ void CUDADataPartition::Init() {
   gpuAssert(cudaStreamCreate(&cuda_streams_[1]), __FILE__, __LINE__);
   gpuAssert(cudaStreamCreate(&cuda_streams_[2]), __FILE__, __LINE__);
   gpuAssert(cudaStreamCreate(&cuda_streams_[3]), __FILE__, __LINE__);
+  CUDASUCCESS_OR_FATAL(cudaEventCreateWithFlags(&split_offsets_ready_event_, cudaEventDisableTiming));
+  CUDASUCCESS_OR_FATAL(cudaEventCreateWithFlags(&split_inner_ready_event_, cudaEventDisableTiming));
   CUDASUCCESS_OR_FATAL(cudaEventCreateWithFlags(&data_indices_ready_event_, cudaEventDisableTiming));
+  CUDASUCCESS_OR_FATAL(cudaEventCreateWithFlags(&data_index_to_leaf_index_ready_event_, cudaEventDisableTiming));
 
   cuda_num_data_.InitFromHostVector(std::vector<data_size_t>{num_data_});
   use_bagging_ = false;
@@ -100,6 +112,7 @@ void CUDADataPartition::Init() {
 
 void CUDADataPartition::BeforeTrain() {
   data_indices_ready_ = false;
+  data_index_to_leaf_index_ready_ = false;
   if (!use_bagging_) {
     LaunchFillDataIndicesBeforeTrain();
   }
@@ -205,6 +218,8 @@ void CUDADataPartition::GenDataToLeftBitVector(
       left_leaf_index,
       right_leaf_index);
   }
+  gpuAssert(cudaEventRecord(data_index_to_leaf_index_ready_event_, cuda_streams_[3]), __FILE__, __LINE__);
+  data_index_to_leaf_index_ready_ = true;
 }
 
 void CUDADataPartition::SplitInner(
@@ -280,6 +295,7 @@ void CUDADataPartition::SetUsedDataIndices(const data_size_t* used_indices, cons
   use_bagging_ = true;
   num_used_indices_ = num_used_indices;
   used_indices_ = used_indices;
+  data_index_to_leaf_index_ready_ = false;
   CopyFromCUDADeviceToCUDADevice<data_size_t>(cuda_data_indices_.RawData(), used_indices, static_cast<size_t>(num_used_indices), __FILE__, __LINE__);
   LaunchFillDataIndexToLeafIndex();
 }
@@ -312,6 +328,7 @@ void CUDADataPartition::ResetTrainingData(const Dataset* train_data, const int n
   use_bagging_ = false;
   num_used_indices_ = 0;
   cur_num_leaves_ = 1;
+  data_index_to_leaf_index_ready_ = false;
 }
 
 void CUDADataPartition::ResetConfig(const Config* config, hist_t* cuda_hist) {
@@ -342,6 +359,7 @@ void CUDADataPartition::ResetByLeafPred(const std::vector<int>& leaf_pred, int n
   }
   num_leaves_ = num_leaves;
   cur_num_leaves_ = num_leaves;
+  data_index_to_leaf_index_ready_ = false;
 }
 
 void CUDADataPartition::ReduceLeafGradStat(
