@@ -11,6 +11,7 @@
 #ifdef USE_CUDA
 
 #include <LightGBM/bin.h>
+#include <LightGBM/cuda/vector_cudahost.h>
 #include <LightGBM/dataset.h>
 
 #include <vector>
@@ -223,6 +224,8 @@ class CUDABestSplitFinder {
   CUDAVector<CUDASplitInfo> cuda_best_split_info_;
   // best split information buffer, to be copied to host
   CUDAVector<int> cuda_best_split_info_buffer_;
+  // persistent pinned host buffer for best-split metadata
+  std::vector<int, CHAllocator<int>> host_leaf_best_split_info_buffer_;
   // find best split task information
   CUDAVector<SplitFindTask> cuda_split_find_tasks_;
   CUDAVector<int8_t> cuda_is_feature_used_bytree_;

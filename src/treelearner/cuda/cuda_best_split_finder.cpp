@@ -95,6 +95,7 @@ void CUDABestSplitFinder::Init() {
   CUDASUCCESS_OR_FATAL(cudaStreamCreate(&cuda_streams_[0]));
   CUDASUCCESS_OR_FATAL(cudaStreamCreate(&cuda_streams_[1]));
   cuda_best_split_info_buffer_.Resize(8);
+  host_leaf_best_split_info_buffer_.resize(8);
   if (use_global_memory_) {
     cuda_feature_hist_grad_buffer_.Resize(static_cast<size_t>(num_total_bin_) * 2);
     cuda_feature_hist_hess_buffer_.Resize(static_cast<size_t>(num_total_bin_) * 2);
