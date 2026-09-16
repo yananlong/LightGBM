@@ -247,7 +247,7 @@ void CUDADataPartition::SplitInner(
   ++cur_num_leaves_;
 }
 
-void CUDADataPartition::UpdateTrainScore(const Tree* tree, double* scores) {
+void CUDADataPartition::UpdateTrainScore(const Tree* tree, double* scores, bool synchronize) {
   const CUDATree* cuda_tree = nullptr;
   std::unique_ptr<CUDATree> cuda_tree_ptr;
   if (tree->is_cuda_tree()) {
@@ -260,7 +260,7 @@ void CUDADataPartition::UpdateTrainScore(const Tree* tree, double* scores) {
     // we need restore the order of indices in cuda_data_indices_
     CopyFromCUDADeviceToCUDADevice<data_size_t>(cuda_data_indices_.RawData(), used_indices_, static_cast<size_t>(num_used_indices_), __FILE__, __LINE__);
   }
-  LaunchAddPredictionToScoreKernel(cuda_tree->cuda_leaf_value(), scores);
+  LaunchAddPredictionToScoreKernel(cuda_tree->cuda_leaf_value(), scores, synchronize);
 }
 
 void CUDADataPartition::CalcBlockDim(const data_size_t num_data_in_leaf) {

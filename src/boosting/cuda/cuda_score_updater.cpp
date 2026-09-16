@@ -8,6 +8,8 @@
 
 #ifdef USE_CUDA
 
+#include <LightGBM/cuda/cuda_tree.hpp>
+
 namespace LightGBM {
 
 CUDAScoreUpdater::CUDAScoreUpdater(const Dataset* data, int num_tree_per_iteration, const bool boosting_on_cuda):
@@ -54,7 +56,12 @@ inline void CUDAScoreUpdater::AddScore(double val, int cur_tree_id) {
 inline void CUDAScoreUpdater::AddScore(const Tree* tree, int cur_tree_id) {
   Common::FunctionTimer fun_timer("ScoreUpdater::AddScore", global_timer);
   const size_t offset = static_cast<size_t>(num_data_) * cur_tree_id;
-  tree->AddPredictionToScore(data_, num_data_, cuda_score_.RawData() + offset);
+  if (boosting_on_cuda_ && tree->is_cuda_tree()) {
+    reinterpret_cast<const CUDATree*>(tree)->AddPredictionToScoreAsync(
+      data_, num_data_, cuda_score_.RawData() + offset);
+  } else {
+    tree->AddPredictionToScore(data_, num_data_, cuda_score_.RawData() + offset);
+  }
   if (!boosting_on_cuda_) {
     CopyFromCUDADeviceToHost<double>(score_.data() + offset, cuda_score_.RawData() + offset, static_cast<size_t>(num_data_), __FILE__, __LINE__);
   }
@@ -73,7 +80,12 @@ inline void CUDAScoreUpdater::AddScore(const Tree* tree, const data_size_t* data
                       data_size_t data_cnt, int cur_tree_id) {
   Common::FunctionTimer fun_timer("ScoreUpdater::AddScore", global_timer);
   const size_t offset = static_cast<size_t>(num_data_) * cur_tree_id;
-  tree->AddPredictionToScore(data_, data_indices, data_cnt, cuda_score_.RawData() + offset);
+  if (boosting_on_cuda_ && tree->is_cuda_tree()) {
+    reinterpret_cast<const CUDATree*>(tree)->AddPredictionToScoreAsync(
+      data_, data_indices, data_cnt, cuda_score_.RawData() + offset);
+  } else {
+    tree->AddPredictionToScore(data_, data_indices, data_cnt, cuda_score_.RawData() + offset);
+  }
   if (!boosting_on_cuda_) {
     CopyFromCUDADeviceToHost<double>(score_.data() + offset, cuda_score_.RawData() + offset, static_cast<size_t>(num_data_), __FILE__, __LINE__);
   }

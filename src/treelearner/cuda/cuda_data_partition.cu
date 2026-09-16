@@ -1110,7 +1110,7 @@ __global__ void AddPredictionToScoreKernel(
   }
 }
 
-void CUDADataPartition::LaunchAddPredictionToScoreKernel(const double* leaf_value, double* cuda_scores) {
+void CUDADataPartition::LaunchAddPredictionToScoreKernel(const double* leaf_value, double* cuda_scores, bool synchronize) {
   global_timer.Start("CUDADataPartition::AddPredictionToScoreKernel");
   const data_size_t num_data_in_root = root_num_data();
   const int num_blocks = (num_data_in_root + FILL_INDICES_BLOCK_SIZE_DATA_PARTITION - 1) / FILL_INDICES_BLOCK_SIZE_DATA_PARTITION;
@@ -1121,7 +1121,9 @@ void CUDADataPartition::LaunchAddPredictionToScoreKernel(const double* leaf_valu
     AddPredictionToScoreKernel<false><<<num_blocks, FILL_INDICES_BLOCK_SIZE_DATA_PARTITION>>>(
       cuda_data_indices_.RawData(), leaf_value, cuda_scores, cuda_data_index_to_leaf_index_.RawData(), num_data_in_root);
   }
-  SynchronizeCUDADevice(__FILE__, __LINE__);
+  if (synchronize) {
+    SynchronizeCUDADevice(__FILE__, __LINE__);
+  }
   global_timer.Stop("CUDADataPartition::AddPredictionToScoreKernel");
 }
 

@@ -150,11 +150,24 @@ void CUDATree::AddPredictionToScore(const Dataset* data,
   SynchronizeCUDADevice(__FILE__, __LINE__);
 }
 
+void CUDATree::AddPredictionToScoreAsync(const Dataset* data,
+                                          data_size_t num_data,
+                                          double* score) const {
+  LaunchAddPredictionToScoreKernel(data, nullptr, num_data, score);
+}
+
 void CUDATree::AddPredictionToScore(const Dataset* data,
                                     const data_size_t* used_data_indices,
                                     data_size_t num_data, double* score) const {
   LaunchAddPredictionToScoreKernel(data, used_data_indices, num_data, score);
   SynchronizeCUDADevice(__FILE__, __LINE__);
+}
+
+void CUDATree::AddPredictionToScoreAsync(const Dataset* data,
+                                          const data_size_t* used_data_indices,
+                                          data_size_t num_data,
+                                          double* score) const {
+  LaunchAddPredictionToScoreKernel(data, used_data_indices, num_data, score);
 }
 
 inline void CUDATree::Shrinkage(double rate) {

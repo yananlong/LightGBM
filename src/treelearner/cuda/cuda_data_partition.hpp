@@ -70,7 +70,7 @@ class CUDADataPartition: public NCCLInfo {
     data_size_t* global_left_leaf_num_data,
     data_size_t* global_right_leaf_num_data);
 
-  void UpdateTrainScore(const Tree* tree, double* cuda_scores);
+  void UpdateTrainScore(const Tree* tree, double* cuda_scores, bool synchronize = true);
 
   void SetUsedDataIndices(const data_size_t* used_indices, const data_size_t num_used_indices);
 
@@ -306,7 +306,7 @@ class CUDADataPartition: public NCCLInfo {
 
 #undef UpdateDataIndexToLeafIndexKernel_PARAMS
 
-  void LaunchAddPredictionToScoreKernel(const double* leaf_value, double* cuda_scores);
+  void LaunchAddPredictionToScoreKernel(const double* leaf_value, double* cuda_scores, bool synchronize);
 
   void LaunchFillDataIndexToLeafIndex();
 

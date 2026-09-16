@@ -70,6 +70,13 @@ class CUDATree : public Tree {
                             data_size_t num_data,
                             double* score) const override;
 
+  // Queue the prediction kernel without waiting for the device. The caller is
+  // responsible for synchronizing before reading the output on the host or
+  // using it from a different stream.
+  void AddPredictionToScoreAsync(const Dataset* data,
+                                 data_size_t num_data,
+                                 double* score) const;
+
   /*!
   * \brief Adding prediction value of this tree model to scores
   * \param data The dataset
@@ -80,6 +87,11 @@ class CUDATree : public Tree {
   void AddPredictionToScore(const Dataset* data,
                             const data_size_t* used_data_indices,
                             data_size_t num_data, double* score) const override;
+
+  // Queue the indexed prediction kernel without waiting for the device.
+  void AddPredictionToScoreAsync(const Dataset* data,
+                                 const data_size_t* used_data_indices,
+                                 data_size_t num_data, double* score) const;
 
   inline void AsConstantTree(double val, int count) override;
 

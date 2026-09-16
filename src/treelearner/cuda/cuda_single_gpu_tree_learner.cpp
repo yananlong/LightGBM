@@ -170,7 +170,7 @@ void CUDASingleGPUTreeLearner::BeforeTrain() {
 }
 
 void CUDASingleGPUTreeLearner::AddPredictionToScore(const Tree* tree, double* out_score) const {
-  cuda_data_partition_->UpdateTrainScore(tree, out_score);
+  cuda_data_partition_->UpdateTrainScore(tree, out_score, !boosting_on_cuda_);
 }
 
 Tree* CUDASingleGPUTreeLearner::Train(const score_t* gradients,
