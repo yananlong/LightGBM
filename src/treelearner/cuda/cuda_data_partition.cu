@@ -1062,15 +1062,14 @@ void CUDADataPartition::LaunchSplitInnerKernel(
 
 #undef SPLIT_TREE_ARGS
   global_timer.Stop("CUDADataPartition::SplitTreeStructureKernel");
-  std::vector<int> cpu_split_info_buffer(18);
-  const double* cpu_sum_hessians_info = reinterpret_cast<const double*>(cpu_split_info_buffer.data() + 8);
+  const double* cpu_sum_hessians_info = reinterpret_cast<const double*>(cpu_split_info_buffer_.data() + 8);
   global_timer.Start("CUDADataPartition::CopyFromCUDADeviceToHostAsync");
-  CopyFromCUDADeviceToHostAsync<int>(cpu_split_info_buffer.data(), cuda_split_info_buffer_.RawData(), 18, cuda_streams_[0], __FILE__, __LINE__);
+  CopyFromCUDADeviceToHostAsync<int>(cpu_split_info_buffer_.data(), cuda_split_info_buffer_.RawData(), 18, cuda_streams_[0], __FILE__, __LINE__);
   SynchronizeCUDAStream(cuda_streams_[0], __FILE__, __LINE__);
   global_timer.Stop("CUDADataPartition::CopyFromCUDADeviceToHostAsync");
-  const data_size_t left_leaf_num_data = cpu_split_info_buffer[1];
-  const data_size_t left_leaf_data_start = cpu_split_info_buffer[2];
-  const data_size_t right_leaf_num_data = cpu_split_info_buffer[4];
+  const data_size_t left_leaf_num_data = cpu_split_info_buffer_[1];
+  const data_size_t left_leaf_data_start = cpu_split_info_buffer_[2];
+  const data_size_t right_leaf_num_data = cpu_split_info_buffer_[4];
   global_timer.Start("CUDADataPartition::CopyDataIndicesKernel");
   gpuAssert(cudaStreamWaitEvent(cuda_streams_[2], split_inner_ready_event_, 0), __FILE__, __LINE__);
   gpuAssert(cudaStreamWaitEvent(cuda_streams_[2], data_index_to_leaf_index_ready_event_, 0), __FILE__, __LINE__);
@@ -1079,7 +1078,7 @@ void CUDADataPartition::LaunchSplitInnerKernel(
   gpuAssert(cudaEventRecord(data_indices_ready_event_, cuda_streams_[2]), __FILE__, __LINE__);
   data_indices_ready_ = true;
   global_timer.Stop("CUDADataPartition::CopyDataIndicesKernel");
-  const data_size_t right_leaf_data_start = cpu_split_info_buffer[5];
+  const data_size_t right_leaf_data_start = cpu_split_info_buffer_[5];
   *left_leaf_num_data_ref = left_leaf_num_data;
   *left_leaf_start_ref = left_leaf_data_start;
   *right_leaf_num_data_ref = right_leaf_num_data;
@@ -1089,8 +1088,8 @@ void CUDADataPartition::LaunchSplitInnerKernel(
   *left_leaf_sum_of_gradients_ref = cpu_sum_hessians_info[2];
   *right_leaf_sum_of_gradients_ref = cpu_sum_hessians_info[3];
   if (nccl_communicator_ != nullptr) {
-    *global_left_leaf_num_data = cpu_split_info_buffer[16];
-    *global_right_leaf_num_data = cpu_split_info_buffer[17];
+    *global_left_leaf_num_data = cpu_split_info_buffer_[16];
+    *global_right_leaf_num_data = cpu_split_info_buffer_[17];
   }
 }
 

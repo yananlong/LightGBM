@@ -92,6 +92,7 @@ void CUDADataPartition::Init() {
   CopyFromHostToCUDADevice<hist_t*>(cuda_hist_pool_.RawData(), &cuda_hist_, 1, __FILE__, __LINE__);
 
   cuda_split_info_buffer_.Resize(18);
+  cpu_split_info_buffer_.resize(18);
 
   cuda_leaf_output_.Resize(static_cast<size_t>(num_leaves_));
 

@@ -10,6 +10,7 @@
 #ifdef USE_CUDA
 
 #include <LightGBM/bin.h>
+#include <LightGBM/cuda/vector_cudahost.h>
 #include <LightGBM/meta.h>
 #include <LightGBM/tree.h>
 
@@ -403,6 +404,8 @@ class CUDADataPartition: public NCCLInfo {
   // split tree structure algorithm related
   /*! \brief buffer to store split information, prepared to be copied to cpu */
   CUDAVector<int> cuda_split_info_buffer_;
+  /*! \brief persistent pinned host buffer for split information */
+  std::vector<int, CHAllocator<int>> cpu_split_info_buffer_;
 
   // dataset information
   /*! \brief number of data in training set, for initialization of cuda_leaf_num_data_ and cuda_leaf_data_end_ */
