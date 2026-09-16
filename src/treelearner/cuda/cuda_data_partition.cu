@@ -1002,7 +1002,6 @@ void CUDADataPartition::LaunchSplitInnerKernel(
       cuda_leaf_num_data_.RawData(), cuda_data_indices_.RawData(),
       grid_dim_);
   }
-  SynchronizeCUDADevice(__FILE__, __LINE__);
   global_timer.Stop("CUDADataPartition::AggregateBlockOffsetKernel");
 
   if (nccl_communicator_ != nullptr) {
