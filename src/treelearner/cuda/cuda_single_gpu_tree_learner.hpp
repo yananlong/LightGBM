@@ -142,6 +142,9 @@ class CUDASingleGPUTreeLearner: public SerialTreeLearner, public NCCLInfo {
   /*! \brief whether boosting is done on CUDA */
   bool boosting_on_cuda_;
 
+  /*! \brief stream reused by transient CUDA trees during training */
+  cudaStream_t cuda_tree_stream_ = nullptr;
+
   // members used in multi-GPU training
   /*! \brief cuda stream for nccl operations */
   cudaStream_t nccl_stream_;

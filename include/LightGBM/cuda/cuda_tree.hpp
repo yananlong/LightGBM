@@ -37,9 +37,10 @@ class CUDATree : public Tree {
   * \param is_linear Whether the tree has linear models at each leaf
   */
   explicit CUDATree(int max_leaves, bool track_branch_features, bool is_linear,
-    const int gpu_device_id, const bool has_categorical_feature);
+    const int gpu_device_id, const bool has_categorical_feature,
+    cudaStream_t cuda_stream = nullptr);
 
-  explicit CUDATree(const Tree* host_tree);
+  explicit CUDATree(const Tree* host_tree, cudaStream_t cuda_stream = nullptr);
 
   ~CUDATree() noexcept;
 
@@ -175,6 +176,7 @@ class CUDATree : public Tree {
   std::vector<int> host_leaf_depth_;
 
   cudaStream_t cuda_stream_;
+  bool owns_cuda_stream_;
 
   const int num_threads_per_block_add_prediction_to_score_;
 };

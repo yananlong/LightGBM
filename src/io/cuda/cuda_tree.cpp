@@ -11,8 +11,11 @@
 namespace LightGBM {
 
 CUDATree::CUDATree(int max_leaves, bool track_branch_features, bool is_linear,
-  const int gpu_device_id, const bool has_categorical_feature):
+  const int gpu_device_id, const bool has_categorical_feature,
+  cudaStream_t cuda_stream):
 Tree(max_leaves, track_branch_features, is_linear),
+cuda_stream_(cuda_stream),
+owns_cuda_stream_(cuda_stream == nullptr),
 num_threads_per_block_add_prediction_to_score_(1024) {
   is_cuda_tree_ = true;
   if (gpu_device_id >= 0) {
@@ -29,15 +32,19 @@ num_threads_per_block_add_prediction_to_score_(1024) {
   host_leaf_depth_[0] = 0;
 }
 
-CUDATree::CUDATree(const Tree* host_tree):
+CUDATree::CUDATree(const Tree* host_tree, cudaStream_t cuda_stream):
   Tree(*host_tree),
+  cuda_stream_(cuda_stream),
+  owns_cuda_stream_(cuda_stream == nullptr),
   num_threads_per_block_add_prediction_to_score_(1024) {
   is_cuda_tree_ = true;
   InitCUDA();
 }
 
 CUDATree::~CUDATree() {
-  gpuAssert(cudaStreamDestroy(cuda_stream_), __FILE__, __LINE__);
+  if (owns_cuda_stream_ && cuda_stream_ != nullptr) {
+    gpuAssert(cudaStreamDestroy(cuda_stream_), __FILE__, __LINE__);
+  }
 }
 
 void CUDATree::InitCUDAMemory() {
@@ -61,8 +68,9 @@ void CUDATree::InitCUDAMemory() {
   CUDASUCCESS_OR_FATAL(cudaMemset(cuda_leaf_weight_.RawData(), 0, sizeof(double)));
   CUDASUCCESS_OR_FATAL(cudaMemset(cuda_leaf_depth_.RawData(), 0, sizeof(int)));
   CUDASUCCESS_OR_FATAL(cudaMemset(cuda_leaf_parent_.RawData(), -1, sizeof(int)));
-  CUDASUCCESS_OR_FATAL(cudaStreamCreate(&cuda_stream_));
-  SynchronizeCUDADevice(__FILE__, __LINE__);
+  if (cuda_stream_ == nullptr) {
+    CUDASUCCESS_OR_FATAL(cudaStreamCreate(&cuda_stream_));
+  }
 }
 
 void CUDATree::InitCUDA() {
@@ -82,8 +90,9 @@ void CUDATree::InitCUDA() {
   cuda_leaf_value_.InitFromHostVector(leaf_value_);
   cuda_leaf_weight_.InitFromHostVector(leaf_weight_);
   cuda_leaf_parent_.InitFromHostVector(leaf_parent_);
-  CUDASUCCESS_OR_FATAL(cudaStreamCreate(&cuda_stream_));
-  SynchronizeCUDADevice(__FILE__, __LINE__);
+  if (cuda_stream_ == nullptr) {
+    CUDASUCCESS_OR_FATAL(cudaStreamCreate(&cuda_stream_));
+  }
 }
 
 int CUDATree::Split(const int leaf_index,
@@ -204,8 +213,6 @@ void CUDATree::ToHost() {
   }
 
   SynchronizeCUDAStream(cuda_stream_, __FILE__, __LINE__);
-
-  SynchronizeCUDADevice(__FILE__, __LINE__);
 }
 
 void CUDATree::SyncLeafOutputFromHostToCUDA() {

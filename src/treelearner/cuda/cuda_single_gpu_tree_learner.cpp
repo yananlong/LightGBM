@@ -24,6 +24,9 @@ namespace LightGBM {
 CUDASingleGPUTreeLearner::CUDASingleGPUTreeLearner(const Config* config, const bool boosting_on_cuda): SerialTreeLearner(config), boosting_on_cuda_(boosting_on_cuda) {}
 
 CUDASingleGPUTreeLearner::~CUDASingleGPUTreeLearner() {
+  if (cuda_tree_stream_ != nullptr) {
+    CUDAStreamDestroy(cuda_tree_stream_);
+  }
   if (nccl_communicator_ != nullptr) {
     CUDAStreamDestroy(nccl_stream_);
   }
@@ -36,6 +39,9 @@ void CUDASingleGPUTreeLearner::Init(const Dataset* train_data, bool is_constant_
   if (nccl_communicator_ == nullptr) {
     gpu_device_id_ = config_->gpu_device_id >= 0 ? config_->gpu_device_id : 0;
     SetCUDADevice(gpu_device_id_, __FILE__, __LINE__);
+  }
+  if (cuda_tree_stream_ == nullptr) {
+    cuda_tree_stream_ = CUDAStreamCreate();
   }
   cuda_smaller_leaf_splits_.reset(new CUDALeafSplits(num_data_));
   cuda_smaller_leaf_splits_->SetNCCLInfo(nccl_communicator_, nccl_gpu_rank_, local_gpu_rank_, gpu_device_id_, global_num_data_);
@@ -176,7 +182,7 @@ Tree* CUDASingleGPUTreeLearner::Train(const score_t* gradients,
   global_timer.Stop("CUDASingleGPUTreeLearner::BeforeTrain");
   const bool track_branch_features = !(config_->interaction_constraints_vector.empty());
   std::unique_ptr<CUDATree> tree(new CUDATree(config_->num_leaves, track_branch_features,
-    config_->linear_tree, gpu_device_id_, has_categorical_feature_));
+    config_->linear_tree, gpu_device_id_, has_categorical_feature_, cuda_tree_stream_));
   // set the root value by hand, as it is not handled by splits
   tree->SetLeafOutput(0, CUDALeafSplits::CalculateSplittedLeafOutput<true, false>(
     leaf_sum_gradients_[smaller_leaf_index_], leaf_sum_hessians_[smaller_leaf_index_],
@@ -509,7 +515,7 @@ void CUDASingleGPUTreeLearner::RenewTreeOutput(Tree* tree, const ObjectiveFuncti
 }
 
 Tree* CUDASingleGPUTreeLearner::FitByExistingTree(const Tree* old_tree, const score_t* gradients, const score_t* hessians) const {
-  std::unique_ptr<CUDATree> cuda_tree(new CUDATree(old_tree));
+  std::unique_ptr<CUDATree> cuda_tree(new CUDATree(old_tree, cuda_tree_stream_));
   cuda_leaf_gradient_stat_buffer_.SetValue(0);
   cuda_leaf_hessian_stat_buffer_.SetValue(0);
   ReduceLeafStat(cuda_tree.get(), gradients, hessians, cuda_data_partition_->cuda_data_indices());
