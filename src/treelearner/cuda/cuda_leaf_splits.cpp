@@ -48,7 +48,6 @@ void CUDALeafSplits::InitValues(
   LaunchInitValuesKernel(lambda_l1, lambda_l2, cuda_bagging_data_indices, cuda_data_indices_in_leaf, num_used_indices, cuda_hist_in_leaf);
   CopyFromCUDADeviceToHost<double>(root_sum_gradients, cuda_sum_of_gradients_buffer_.RawData(), 1, __FILE__, __LINE__);
   CopyFromCUDADeviceToHost<double>(root_sum_hessians, cuda_sum_of_hessians_buffer_.RawData(), 1, __FILE__, __LINE__);
-  SynchronizeCUDADevice(__FILE__, __LINE__);
 }
 
 void CUDALeafSplits::InitValues(
@@ -63,7 +62,6 @@ void CUDALeafSplits::InitValues(
   LaunchInitValuesKernel(lambda_l1, lambda_l2, cuda_bagging_data_indices, cuda_data_indices_in_leaf, num_used_indices, cuda_hist_in_leaf, grad_scale, hess_scale);
   CopyFromCUDADeviceToHost<double>(root_sum_gradients, cuda_sum_of_gradients_buffer_.RawData(), 1, __FILE__, __LINE__);
   CopyFromCUDADeviceToHost<double>(root_sum_hessians, cuda_sum_of_hessians_buffer_.RawData(), 1, __FILE__, __LINE__);
-  SynchronizeCUDADevice(__FILE__, __LINE__);
 }
 
 void CUDALeafSplits::Resize(const data_size_t num_data) {
