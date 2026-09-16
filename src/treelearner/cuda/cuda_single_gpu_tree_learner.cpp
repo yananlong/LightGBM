@@ -404,7 +404,6 @@ Tree* CUDASingleGPUTreeLearner::Train(const score_t* gradients,
     }
     global_timer.Stop("CUDASingleGPUTreeLearner::Split");
   }
-  SynchronizeCUDADevice(__FILE__, __LINE__);
   if (config_->use_quantized_grad && config_->quant_train_renew_leaf) {
     global_timer.Start("CUDASingleGPUTreeLearner::RenewDiscretizedTreeLeaves");
     RenewDiscretizedTreeLeaves(tree.get());
