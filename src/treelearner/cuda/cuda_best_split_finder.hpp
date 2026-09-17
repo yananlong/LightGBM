@@ -100,6 +100,8 @@ class CUDABestSplitFinder {
   void SetUsedFeatureByNode(const std::vector<int8_t>& is_feature_used_by_smaller_node,
                             const std::vector<int8_t>& is_feature_used_by_larger_node);
 
+  void SetHistogramReadyEvent(cudaEvent_t event) { histogram_ready_event_ = event; }
+
  private:
   #define LaunchFindBestSplitsForLeafKernel_PARAMS \
     const CUDALeafSplitsStruct* smaller_leaf_splits, \
@@ -201,6 +203,7 @@ class CUDABestSplitFinder {
   bool use_smoothing_;
   double path_smooth_;
   std::vector<cudaStream_t> cuda_streams_;
+  cudaEvent_t histogram_ready_event_ = nullptr;
   // for best split find tasks
   std::vector<SplitFindTask> split_find_tasks_;
   int num_tasks_;

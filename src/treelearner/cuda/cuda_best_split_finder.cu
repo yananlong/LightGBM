@@ -1832,12 +1832,17 @@ void CUDABestSplitFinder::LaunchFindBestSplitsForLeafKernelInner2(LaunchFindBest
   }
   if (!use_global_memory_) {
     if (is_smaller_leaf_valid) {
+      if (histogram_ready_event_ != nullptr) {
+        CUDASUCCESS_OR_FATAL(cudaStreamWaitEvent(cuda_streams_[0], histogram_ready_event_, 0));
+      }
       FindBestSplitsForLeafKernel<USE_RAND, USE_L1, USE_SMOOTHING, false>
         <<<num_tasks_, NUM_THREADS_PER_BLOCK_BEST_SPLIT_FINDER, 0, cuda_streams_[0]>>>
         (is_feature_used_by_smaller_node, FindBestSplitsForLeafKernel_ARGS);
     }
-    SynchronizeCUDADevice(__FILE__, __LINE__);
     if (is_larger_leaf_valid) {
+      if (histogram_ready_event_ != nullptr) {
+        CUDASUCCESS_OR_FATAL(cudaStreamWaitEvent(cuda_streams_[1], histogram_ready_event_, 0));
+      }
       FindBestSplitsForLeafKernel<USE_RAND, USE_L1, USE_SMOOTHING, true>
         <<<num_tasks_, NUM_THREADS_PER_BLOCK_BEST_SPLIT_FINDER, 0, cuda_streams_[1]>>>
         (is_feature_used_by_larger_node, FindBestSplitsForLeafKernel_ARGS);
@@ -1949,12 +1954,17 @@ template <bool USE_RAND, bool USE_L1, bool USE_SMOOTHING>
 void CUDABestSplitFinder::LaunchFindBestSplitsDiscretizedForLeafKernelInner2(LaunchFindBestSplitsDiscretizedForLeafKernel_PARAMS) {
   if (!use_global_memory_) {
     if (is_smaller_leaf_valid) {
+      if (histogram_ready_event_ != nullptr) {
+        CUDASUCCESS_OR_FATAL(cudaStreamWaitEvent(cuda_streams_[0], histogram_ready_event_, 0));
+      }
       FindBestSplitsDiscretizedForLeafKernel<USE_RAND, USE_L1, USE_SMOOTHING, false>
         <<<num_tasks_, NUM_THREADS_PER_BLOCK_BEST_SPLIT_FINDER, 0, cuda_streams_[0]>>>
         (FindBestSplitsDiscretizedForLeafKernel_ARGS);
     }
-    SynchronizeCUDADevice(__FILE__, __LINE__);
     if (is_larger_leaf_valid) {
+      if (histogram_ready_event_ != nullptr) {
+        CUDASUCCESS_OR_FATAL(cudaStreamWaitEvent(cuda_streams_[1], histogram_ready_event_, 0));
+      }
       FindBestSplitsDiscretizedForLeafKernel<USE_RAND, USE_L1, USE_SMOOTHING, true>
         <<<num_tasks_, NUM_THREADS_PER_BLOCK_BEST_SPLIT_FINDER, 0, cuda_streams_[1]>>>
         (FindBestSplitsDiscretizedForLeafKernel_ARGS);

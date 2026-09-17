@@ -79,6 +79,11 @@ class CUDAHistogramConstructor {
   // Add a device-side dependency on the post-split data-index copy.
   void WaitForDataIndices(cudaEvent_t event);
 
+  // Add a device-side dependency on the most recently queued histogram work.
+  void WaitForHistogram(cudaStream_t stream) const;
+
+  cudaEvent_t histogram_ready_event() const { return histogram_ready_event_; }
+
  private:
   void InitFeatureMetaInfo(const Dataset* train_data, const std::vector<uint32_t>& feature_hist_offsets);
 
@@ -150,6 +155,8 @@ class CUDAHistogramConstructor {
   double min_sum_hessian_in_leaf_;
   /*! \brief cuda stream for histogram construction */
   cudaStream_t cuda_stream_;
+  /*! \brief completion event for the most recently queued histogram work */
+  cudaEvent_t histogram_ready_event_ = nullptr;
   /*! \brief indices of feature whose histograms need to be fixed */
   std::vector<int> need_fix_histogram_features_;
   /*! \brief aligned number of bins of the features whose histograms need to be fixed */

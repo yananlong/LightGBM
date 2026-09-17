@@ -40,12 +40,21 @@ CUDAHistogramConstructor::CUDAHistogramConstructor(
 }
 
 CUDAHistogramConstructor::~CUDAHistogramConstructor() {
+  if (histogram_ready_event_ != nullptr) {
+    CUDASUCCESS_OR_FATAL(cudaEventDestroy(histogram_ready_event_));
+  }
   gpuAssert(cudaStreamDestroy(cuda_stream_), __FILE__, __LINE__);
 }
 
 void CUDAHistogramConstructor::WaitForDataIndices(cudaEvent_t event) {
   if (event != nullptr) {
     gpuAssert(cudaStreamWaitEvent(cuda_stream_, event, 0), __FILE__, __LINE__);
+  }
+}
+
+void CUDAHistogramConstructor::WaitForHistogram(cudaStream_t stream) const {
+  if (histogram_ready_event_ != nullptr) {
+    gpuAssert(cudaStreamWaitEvent(stream, histogram_ready_event_, 0), __FILE__, __LINE__);
   }
 }
 
@@ -99,6 +108,7 @@ void CUDAHistogramConstructor::Init(const Dataset* train_data, TrainingShareStat
   cuda_row_data_->Init(train_data, share_state);
 
   CUDASUCCESS_OR_FATAL(cudaStreamCreate(&cuda_stream_));
+  CUDASUCCESS_OR_FATAL(cudaEventCreateWithFlags(&histogram_ready_event_, cudaEventDisableTiming));
 
   cuda_need_fix_histogram_features_.InitFromHostVector(need_fix_histogram_features_);
   cuda_need_fix_histogram_features_num_bin_aligned_.InitFromHostVector(need_fix_histogram_features_num_bin_aligend_);
@@ -132,12 +142,13 @@ void CUDAHistogramConstructor::ConstructHistogramForLeaf(
   const double sum_hessians_in_smaller_leaf,
   const double sum_hessians_in_larger_leaf,
   const uint8_t num_bits_in_histogram_bins) {
-if ((global_num_data_in_smaller_leaf <= min_data_in_leaf_ || sum_hessians_in_smaller_leaf <= min_sum_hessian_in_leaf_) &&
+  if ((global_num_data_in_smaller_leaf <= min_data_in_leaf_ || sum_hessians_in_smaller_leaf <= min_sum_hessian_in_leaf_) &&
     (global_num_data_in_larger_leaf <= min_data_in_leaf_ || sum_hessians_in_larger_leaf <= min_sum_hessian_in_leaf_)) {
+    CUDASUCCESS_OR_FATAL(cudaEventRecord(histogram_ready_event_, cuda_stream_));
     return;
   }
   LaunchConstructHistogramKernel(cuda_smaller_leaf_splits, num_data_in_smaller_leaf, num_bits_in_histogram_bins);
-  SynchronizeCUDAStream(cuda_stream_, __FILE__, __LINE__);
+  CUDASUCCESS_OR_FATAL(cudaEventRecord(histogram_ready_event_, cuda_stream_));
 }
 
 void CUDAHistogramConstructor::SubtractHistogramForLeaf(
@@ -150,6 +161,7 @@ void CUDAHistogramConstructor::SubtractHistogramForLeaf(
   global_timer.Start("CUDAHistogramConstructor::ConstructHistogramForLeaf::LaunchSubtractHistogramKernel");
   LaunchSubtractHistogramKernel(cuda_smaller_leaf_splits, cuda_larger_leaf_splits, use_quantized_grad,
                                 parent_num_bits_in_histogram_bins, smaller_num_bits_in_histogram_bins, larger_num_bits_in_histogram_bins);
+  CUDASUCCESS_OR_FATAL(cudaEventRecord(histogram_ready_event_, cuda_stream_));
   global_timer.Stop("CUDAHistogramConstructor::ConstructHistogramForLeaf::LaunchSubtractHistogramKernel");
 }
 

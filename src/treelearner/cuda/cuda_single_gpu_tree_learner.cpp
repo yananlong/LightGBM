@@ -68,6 +68,7 @@ void CUDASingleGPUTreeLearner::Init(const Dataset* train_data, bool is_constant_
   cuda_best_split_finder_.reset(new CUDABestSplitFinder(cuda_histogram_constructor_->cuda_hist(),
     train_data_, this->share_state_->feature_hist_offsets(), select_features_by_node_, config_));
   cuda_best_split_finder_->Init();
+  cuda_best_split_finder_->SetHistogramReadyEvent(cuda_histogram_constructor_->histogram_ready_event());
 
   leaf_best_split_feature_.resize(config_->num_leaves, -1);
   leaf_best_split_threshold_.resize(config_->num_leaves, 0);
@@ -693,6 +694,7 @@ void CUDASingleGPUTreeLearner::SetNCCLInfo(
 }
 
 void CUDASingleGPUTreeLearner::NCCLReduceHistogram() {
+  cuda_histogram_constructor_->WaitForHistogram(nccl_stream_);
   if (config_->use_quantized_grad) {
     hist_t* smaller_leaf_hist_pointer = cuda_histogram_constructor_->cuda_hist_pointer() +
       leaf_to_hist_index_map_[smaller_leaf_index_] * num_total_bin_;
