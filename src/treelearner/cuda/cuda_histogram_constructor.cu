@@ -66,7 +66,7 @@ __global__ void CUDAConstructHistogramDenseKernel(
   __syncthreads();
   hist_t* feature_histogram_ptr = smaller_leaf_splits->hist_in_leaf + (partition_hist_start << 1);
   for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
-    atomicAdd_system(feature_histogram_ptr + i, shared_hist[i]);
+    atomicAdd_global(feature_histogram_ptr + i, shared_hist[i]);
   }
 }
 
@@ -124,7 +124,7 @@ __global__ void CUDAConstructHistogramSparseKernel(
   __syncthreads();
   hist_t* feature_histogram_ptr = smaller_leaf_splits->hist_in_leaf + (partition_hist_start << 1);
   for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
-    atomicAdd_system(feature_histogram_ptr + i, shared_hist[i]);
+    atomicAdd_global(feature_histogram_ptr + i, shared_hist[i]);
   }
 }
 
@@ -185,7 +185,7 @@ __global__ void CUDAConstructHistogramDenseKernel_GlobalMemory(
   __syncthreads();
   hist_t* feature_histogram_ptr = smaller_leaf_splits->hist_in_leaf + (partition_hist_start << 1);
   for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
-    atomicAdd_system(feature_histogram_ptr + i, shared_hist[i]);
+    atomicAdd_global(feature_histogram_ptr + i, shared_hist[i]);
   }
 }
 
@@ -245,7 +245,7 @@ __global__ void CUDAConstructHistogramSparseKernel_GlobalMemory(
   __syncthreads();
   hist_t* feature_histogram_ptr = smaller_leaf_splits->hist_in_leaf + (partition_hist_start << 1);
   for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
-    atomicAdd_system(feature_histogram_ptr + i, shared_hist[i]);
+    atomicAdd_global(feature_histogram_ptr + i, shared_hist[i]);
   }
 }
 
@@ -303,14 +303,14 @@ __global__ void CUDAConstructDiscretizedHistogramDenseKernel(
     int32_t* feature_histogram_ptr = reinterpret_cast<int32_t*>(smaller_leaf_splits->hist_in_leaf) + partition_hist_start;
     for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
       const int32_t packed_grad_hess = shared_hist_packed[i];
-      atomicAdd_system(feature_histogram_ptr + i, packed_grad_hess);
+      atomicAdd_global(feature_histogram_ptr + i, packed_grad_hess);
     }
   } else {
     atomic_add_long_t* feature_histogram_ptr = reinterpret_cast<atomic_add_long_t*>(smaller_leaf_splits->hist_in_leaf) + partition_hist_start;
     for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
       const int32_t packed_grad_hess = shared_hist_packed[i];
       const int64_t packed_grad_hess_int64 = (static_cast<int64_t>(static_cast<int16_t>(packed_grad_hess >> 16)) << 32) | (static_cast<int64_t>(packed_grad_hess & 0x0000ffff));
-      atomicAdd_system(feature_histogram_ptr + i, (atomic_add_long_t)(packed_grad_hess_int64));
+      atomicAdd_global(feature_histogram_ptr + i, (atomic_add_long_t)(packed_grad_hess_int64));
     }
   }
 }
@@ -368,14 +368,14 @@ __global__ void CUDAConstructDiscretizedHistogramSparseKernel(
     int32_t* feature_histogram_ptr = reinterpret_cast<int32_t*>(smaller_leaf_splits->hist_in_leaf) + partition_hist_start;
     for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
       const int32_t packed_grad_hess = shared_hist_packed[i];
-      atomicAdd_system(feature_histogram_ptr + i, packed_grad_hess);
+      atomicAdd_global(feature_histogram_ptr + i, packed_grad_hess);
     }
   } else {
     atomic_add_long_t* feature_histogram_ptr = reinterpret_cast<atomic_add_long_t*>(smaller_leaf_splits->hist_in_leaf) + partition_hist_start;
     for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
       const int32_t packed_grad_hess = shared_hist_packed[i];
       const int64_t packed_grad_hess_int64 = (static_cast<int64_t>(static_cast<int16_t>(packed_grad_hess >> 16)) << 32) | (static_cast<int64_t>(packed_grad_hess & 0x0000ffff));
-      atomicAdd_system(feature_histogram_ptr + i, (atomic_add_long_t)(packed_grad_hess_int64));
+      atomicAdd_global(feature_histogram_ptr + i, (atomic_add_long_t)(packed_grad_hess_int64));
     }
   }
 }
@@ -435,14 +435,14 @@ __global__ void CUDAConstructDiscretizedHistogramDenseKernel_GlobalMemory(
     int32_t* feature_histogram_ptr = reinterpret_cast<int32_t*>(smaller_leaf_splits->hist_in_leaf) + partition_hist_start;
     for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
       const int32_t packed_grad_hess = shared_hist_packed[i];
-      atomicAdd_system(feature_histogram_ptr + i, packed_grad_hess);
+      atomicAdd_global(feature_histogram_ptr + i, packed_grad_hess);
     }
   } else {
     atomic_add_long_t* feature_histogram_ptr = reinterpret_cast<atomic_add_long_t*>(smaller_leaf_splits->hist_in_leaf) + partition_hist_start;
     for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
       const int32_t packed_grad_hess = shared_hist_packed[i];
       const int64_t packed_grad_hess_int64 = (static_cast<int64_t>(static_cast<int16_t>(packed_grad_hess >> 16)) << 32) | (static_cast<int64_t>(packed_grad_hess & 0x0000ffff));
-      atomicAdd_system(feature_histogram_ptr + i, (atomic_add_long_t)(packed_grad_hess_int64));
+      atomicAdd_global(feature_histogram_ptr + i, (atomic_add_long_t)(packed_grad_hess_int64));
     }
   }
 }
@@ -501,14 +501,14 @@ __global__ void CUDAConstructDiscretizedHistogramSparseKernel_GlobalMemory(
     int32_t* feature_histogram_ptr = reinterpret_cast<int32_t*>(smaller_leaf_splits->hist_in_leaf) + partition_hist_start;
     for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
       const int32_t packed_grad_hess = shared_hist_packed[i];
-      atomicAdd_system(feature_histogram_ptr + i, packed_grad_hess);
+      atomicAdd_global(feature_histogram_ptr + i, packed_grad_hess);
     }
   } else {
     atomic_add_long_t* feature_histogram_ptr = reinterpret_cast<atomic_add_long_t*>(smaller_leaf_splits->hist_in_leaf) + partition_hist_start;
     for (unsigned int i = thread_idx; i < num_items_in_partition; i += num_threads_per_block) {
       const int32_t packed_grad_hess = shared_hist_packed[i];
       const int64_t packed_grad_hess_int64 = (static_cast<int64_t>(static_cast<int16_t>(packed_grad_hess >> 16)) << 32) | (static_cast<int64_t>(packed_grad_hess & 0x0000ffff));
-      atomicAdd_system(feature_histogram_ptr + i, (atomic_add_long_t)(packed_grad_hess_int64));
+      atomicAdd_global(feature_histogram_ptr + i, (atomic_add_long_t)(packed_grad_hess_int64));
     }
   }
 }

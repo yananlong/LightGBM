@@ -11,6 +11,7 @@
 
 // ROCm doesn't have atomicAdd_block, but it should be semantically the same as atomicAdd
 #define atomicAdd_block atomicAdd
+#define atomicAdd_global atomicAdd
 
 // hipify
 #include <hip/hip_runtime.h>
@@ -70,6 +71,7 @@ static inline constexpr int WARP_SIZE_INTERNAL() {
 #else  // __HIP_PLATFORM_AMD__
 // CUDA warpSize is not a constexpr, but always 32
 #define WARPSIZE 32
+#define atomicAdd_global atomicAdd_system
 #endif  // defined(__HIP_PLATFORM_AMD__) || defined(__HIP__)
 
 #endif  // USE_CUDA
