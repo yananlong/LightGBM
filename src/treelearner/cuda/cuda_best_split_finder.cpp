@@ -48,6 +48,7 @@ CUDABestSplitFinder::CUDABestSplitFinder(
 }
 
 CUDABestSplitFinder::~CUDABestSplitFinder() {
+  gpuAssert(cudaEventDestroy(split_results_ready_event_), __FILE__, __LINE__);
   gpuAssert(cudaStreamDestroy(cuda_streams_[0]), __FILE__, __LINE__);
   gpuAssert(cudaStreamDestroy(cuda_streams_[1]), __FILE__, __LINE__);
   cuda_streams_.clear();
@@ -94,6 +95,7 @@ void CUDABestSplitFinder::Init() {
   cuda_streams_.resize(2);
   CUDASUCCESS_OR_FATAL(cudaStreamCreate(&cuda_streams_[0]));
   CUDASUCCESS_OR_FATAL(cudaStreamCreate(&cuda_streams_[1]));
+  CUDASUCCESS_OR_FATAL(cudaEventCreateWithFlags(&split_results_ready_event_, cudaEventDisableTiming));
   cuda_best_split_info_buffer_.Resize(8);
   host_leaf_best_split_info_buffer_.resize(8);
   if (use_global_memory_) {
@@ -335,10 +337,7 @@ void CUDABestSplitFinder::FindBestSplitsForLeaf(
   }
   global_timer.Start("CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel");
   LaunchSyncBestSplitForLeafKernel(smaller_leaf_index, larger_leaf_index, is_smaller_leaf_valid, is_larger_leaf_valid);
-  if (is_smaller_leaf_valid && is_larger_leaf_valid) {
-    SynchronizeCUDAStream(cuda_streams_[0], __FILE__, __LINE__);
-    SynchronizeCUDAStream(cuda_streams_[1], __FILE__, __LINE__);
-  } else {
+  if (!is_smaller_leaf_valid || !is_larger_leaf_valid) {
     SynchronizeCUDADevice(__FILE__, __LINE__);
   }
   global_timer.Stop("CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel");

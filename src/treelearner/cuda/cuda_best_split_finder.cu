@@ -2111,6 +2111,7 @@ void CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel(
       host_smaller_leaf_index, host_larger_leaf_index);
   }
   if (!is_smaller_leaf_valid && !is_larger_leaf_valid) {
+    CUDASUCCESS_OR_FATAL(cudaEventRecord(split_results_ready_event_, nullptr));
     return;
   }
   int num_tasks = num_tasks_;
@@ -2162,6 +2163,7 @@ void CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel(
         cuda_leaf_best_split_info_.RawData(),
         true);
     }
+    CUDASUCCESS_OR_FATAL(cudaEventRecord(split_results_ready_event_, cuda_streams_[0]));
   } else {
     const bool larger_only = (!is_smaller_leaf_valid && is_larger_leaf_valid);
     SyncBestSplitForLeafKernel<<<num_blocks_per_leaf, NUM_TASKS_PER_SYNC_BLOCK>>>(
@@ -2185,6 +2187,7 @@ void CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel(
         cuda_leaf_best_split_info_.RawData(),
         larger_only);
     }
+    CUDASUCCESS_OR_FATAL(cudaEventRecord(split_results_ready_event_, nullptr));
   }
 }
 
@@ -2247,6 +2250,7 @@ void CUDABestSplitFinder::LaunchFindBestFromAllSplitsKernel(
   uint8_t* larger_leaf_best_split_default_left,
   int* best_leaf_index,
   int* num_cat_threshold) {
+  CUDASUCCESS_OR_FATAL(cudaStreamWaitEvent(cuda_streams_[1], split_results_ready_event_, 0));
   FindBestFromAllSplitsKernel<<<1, NUM_THREADS_FIND_BEST_LEAF, 0, cuda_streams_[1]>>>(cur_num_leaves,
     cuda_leaf_best_split_info_.RawData(),
     cuda_best_split_info_buffer_.RawData());

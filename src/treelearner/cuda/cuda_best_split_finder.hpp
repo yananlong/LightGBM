@@ -203,6 +203,7 @@ class CUDABestSplitFinder {
   bool use_smoothing_;
   double path_smooth_;
   std::vector<cudaStream_t> cuda_streams_;
+  cudaEvent_t split_results_ready_event_ = nullptr;
   cudaEvent_t histogram_ready_event_ = nullptr;
   // for best split find tasks
   std::vector<SplitFindTask> split_find_tasks_;
