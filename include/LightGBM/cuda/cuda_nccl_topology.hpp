@@ -100,7 +100,13 @@ class NCCLTopology {
     host_threads_.resize(num_gpu_);
   }
 
-  ~NCCLTopology() {}
+  ~NCCLTopology() {
+    for (ncclComm_t nccl_communicator : nccl_communicators_) {
+      if (nccl_communicator != nullptr) {
+        ReleaseNCCLCommunicatorStream(nccl_communicator);
+      }
+    }
+  }
 
   void InitNCCL() {
     nccl_gpu_rank_.resize(num_gpu_, -1);

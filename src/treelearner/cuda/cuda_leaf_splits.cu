@@ -334,13 +334,12 @@ void CUDALeafSplits::LaunchInitValuesKernel(
     ReduceGradKernel<<<1, NUM_THREADS_PER_BLOCK_LEAF_SPLITS>>>(num_blocks_init_from_gradients_, cuda_sum_of_gradients_buffer_.RawData(),
       cuda_sum_of_hessians_buffer_.RawData(), num_used_indices);
     SynchronizeCUDADevice(__FILE__, __LINE__);
-    cudaStream_t cuda_stream = CUDAStreamCreate();
+    cudaStream_t cuda_stream = NCCLCommunicatorStream(nccl_communicator_);
     NCCLGroupStart();
     NCCLAllReduce<double>(cuda_sum_of_gradients_buffer_.RawData(), cuda_sum_of_gradients_buffer_.RawData(), 1, ncclFloat64, ncclSum, nccl_communicator_, cuda_stream);
     NCCLAllReduce<double>(cuda_sum_of_hessians_buffer_.RawData(), cuda_sum_of_hessians_buffer_.RawData(), 1, ncclFloat64, ncclSum, nccl_communicator_, cuda_stream);
     NCCLGroupEnd();
     SynchronizeCUDAStream(cuda_stream, __FILE__, __LINE__);
-    CUDAStreamDestroy(cuda_stream);
     CUDAInitSetValuesKernel<<<1, 1>>>(lambda_l1, lambda_l2, cuda_sum_of_gradients_buffer_.RawData(),
       cuda_sum_of_hessians_buffer_.RawData(), num_used_indices,
       cuda_data_indices_in_leaf, cuda_hist_in_leaf, cuda_struct_.RawData());
@@ -384,14 +383,13 @@ void CUDALeafSplits::LaunchInitValuesKernel(
       num_used_indices);
     SynchronizeCUDADevice(__FILE__, __LINE__);
 
-    cudaStream_t cuda_stream = CUDAStreamCreate();
+    cudaStream_t cuda_stream = NCCLCommunicatorStream(nccl_communicator_);
     NCCLGroupStart();
     NCCLAllReduce<double>(cuda_sum_of_gradients_buffer_.RawData(), cuda_sum_of_gradients_buffer_.RawData(), 1, ncclFloat64, ncclSum, nccl_communicator_, cuda_stream);
     NCCLAllReduce<double>(cuda_sum_of_hessians_buffer_.RawData(), cuda_sum_of_hessians_buffer_.RawData(), 1, ncclFloat64, ncclSum, nccl_communicator_, cuda_stream);
     NCCLAllReduce<int64_t>(cuda_sum_of_gradients_hessians_buffer_.RawData(), cuda_sum_of_gradients_hessians_buffer_.RawData(), 1, ncclInt64, ncclSum, nccl_communicator_, cuda_stream);
     NCCLGroupEnd();
     SynchronizeCUDAStream(cuda_stream, __FILE__, __LINE__);
-    CUDAStreamDestroy(cuda_stream);
     CUDAInitSetValuesKernel<<<1, 1>>>(lambda_l1, lambda_l2, cuda_sum_of_gradients_buffer_.RawData(),
       cuda_sum_of_hessians_buffer_.RawData(), cuda_sum_of_gradients_hessians_buffer_.RawData(), num_used_indices,
       cuda_data_indices_in_leaf, cuda_hist_in_leaf, cuda_struct_.RawData());
