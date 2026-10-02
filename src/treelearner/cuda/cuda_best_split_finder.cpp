@@ -346,9 +346,7 @@ void CUDABestSplitFinder::FindBestSplitsForLeaf(
   }
   global_timer.Start("CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel");
   LaunchSyncBestSplitForLeafKernel(smaller_leaf_index, larger_leaf_index, is_smaller_leaf_valid, is_larger_leaf_valid);
-  if (!is_smaller_leaf_valid || !is_larger_leaf_valid) {
-    SynchronizeCUDADevice(__FILE__, __LINE__);
-  }
+  // FindBestFromAllSplits waits on split_results_ready_event_ before consuming these results.
   global_timer.Stop("CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel");
 }
 
