@@ -223,3 +223,30 @@ def test_cuda_quantized_nan_and_zero():
         num_boost_round=25,
         min_data_in_leaf=50,
     )
+
+
+def test_cuda_multi_gpu_repeated_updates():
+    """Regression test for RCCL/NCCL use-after-free of destroyed collective streams.
+
+    num_gpu=2 is clamped to the number of visible devices, so on a single-GPU machine this still
+    runs (without a second rank); with two or more devices it exercises the NCCL training path
+    for several iterations.
+    """
+    X, y = _make_binary_data(n_samples=20_000, n_features=64, random_state=714)
+    booster = lgb.train(
+        {
+            "objective": "binary",
+            "metric": "binary_logloss",
+            "device_type": "cuda",
+            "num_gpu": 2,
+            "max_bin": 63,
+            "num_leaves": 31,
+            "seed": 714,
+            "verbosity": -1,
+        },
+        lgb.Dataset(X, label=y),
+        num_boost_round=10,
+    )
+    probabilities = booster.predict(X)
+    assert np.isfinite(probabilities).all()
+    assert roc_auc_score(y, probabilities) > 0.7

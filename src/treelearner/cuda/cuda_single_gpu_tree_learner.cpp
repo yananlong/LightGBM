@@ -27,9 +27,7 @@ CUDASingleGPUTreeLearner::~CUDASingleGPUTreeLearner() {
   if (cuda_tree_stream_ != nullptr) {
     CUDAStreamDestroy(cuda_tree_stream_);
   }
-  if (nccl_communicator_ != nullptr) {
-    CUDAStreamDestroy(nccl_stream_);
-  }
+  // nccl_stream_ is owned by the communicator (see NCCLCommunicatorStream()) and is not destroyed here.
   DeallocateCUDAMemory(&cuda_bitset_, __FILE__, __LINE__);
   DeallocateCUDAMemory(&cuda_bitset_inner_, __FILE__, __LINE__);
   DeallocateCUDAMemory(&cuda_block_bitset_len_buffer_, __FILE__, __LINE__);
@@ -695,7 +693,8 @@ void CUDASingleGPUTreeLearner::SetNCCLInfo(
   NCCLInfo::SetNCCLInfo(nccl_communicator, nccl_gpu_rank, local_gpu_rank, gpu_device_id, global_num_data);
   leaf_to_hist_index_map_.resize(config_->num_leaves - 1);
   global_num_data_in_leaf_.resize(config_->num_leaves, 0);
-  nccl_stream_ = CUDAStreamCreate();
+  // The communicator remembers the last stream it was used with, so all of its collectives share one persistent stream.
+  nccl_stream_ = nccl_communicator_ != nullptr ? NCCLCommunicatorStream(nccl_communicator_) : nullptr;
 }
 
 void CUDASingleGPUTreeLearner::NCCLReduceHistogram() {
