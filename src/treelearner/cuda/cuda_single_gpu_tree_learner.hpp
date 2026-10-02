@@ -144,6 +144,9 @@ class CUDASingleGPUTreeLearner: public SerialTreeLearner, public NCCLInfo {
 
   /*! \brief stream reused by transient CUDA trees during training */
   cudaStream_t cuda_tree_stream_ = nullptr;
+  // recorded on cuda_tree_stream_ after each tree split kernel; the best split finder waits for it before it
+  // overwrites the CUDASplitInfo the tree split kernel is still reading
+  cudaEvent_t tree_split_event_ = nullptr;
 
   // members used in multi-GPU training
   /*! \brief cuda stream for nccl operations */

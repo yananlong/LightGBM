@@ -102,6 +102,8 @@ class CUDABestSplitFinder {
 
   void SetHistogramReadyEvent(cudaEvent_t event) { histogram_ready_event_ = event; }
 
+  void SetTreeSplitEvent(cudaEvent_t event) { tree_split_event_ = event; }
+
  private:
   #define LaunchFindBestSplitsForLeafKernel_PARAMS \
     const CUDALeafSplitsStruct* smaller_leaf_splits, \
@@ -205,6 +207,7 @@ class CUDABestSplitFinder {
   std::vector<cudaStream_t> cuda_streams_;
   cudaEvent_t split_results_ready_event_ = nullptr;
   cudaEvent_t histogram_ready_event_ = nullptr;
+  cudaEvent_t tree_split_event_ = nullptr;
   // for best split find tasks
   std::vector<SplitFindTask> split_find_tasks_;
   int num_tasks_;

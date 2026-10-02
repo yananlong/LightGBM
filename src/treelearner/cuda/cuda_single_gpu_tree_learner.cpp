@@ -24,6 +24,9 @@ namespace LightGBM {
 CUDASingleGPUTreeLearner::CUDASingleGPUTreeLearner(const Config* config, const bool boosting_on_cuda): SerialTreeLearner(config), boosting_on_cuda_(boosting_on_cuda) {}
 
 CUDASingleGPUTreeLearner::~CUDASingleGPUTreeLearner() {
+  if (tree_split_event_ != nullptr) {
+    CUDASUCCESS_OR_FATAL(cudaEventDestroy(tree_split_event_));
+  }
   if (cuda_tree_stream_ != nullptr) {
     CUDAStreamDestroy(cuda_tree_stream_);
   }
@@ -72,6 +75,10 @@ void CUDASingleGPUTreeLearner::Init(const Dataset* train_data, bool is_constant_
     train_data_, this->share_state_->feature_hist_offsets(), select_features_by_node_, config_));
   cuda_best_split_finder_->Init();
   cuda_best_split_finder_->SetHistogramReadyEvent(cuda_histogram_constructor_->histogram_ready_event());
+  if (tree_split_event_ == nullptr) {
+    CUDASUCCESS_OR_FATAL(cudaEventCreateWithFlags(&tree_split_event_, cudaEventDisableTiming));
+  }
+  cuda_best_split_finder_->SetTreeSplitEvent(tree_split_event_);
 
   leaf_best_split_feature_.resize(config_->num_leaves, -1);
   leaf_best_split_threshold_.resize(config_->num_leaves, 0);
@@ -361,6 +368,10 @@ Tree* CUDASingleGPUTreeLearner::Train(const score_t* gradients,
                                        best_split_info);
     }
 
+    // The tree split kernel runs asynchronously on cuda_tree_stream_ and reads best_split_info, which is an entry
+    // of the best split finder's per-leaf results. The finder overwrites that entry when it evaluates the
+    // children, so it has to wait for this kernel (see CUDABestSplitFinder::FindBestSplitsForLeaf).
+    CUDASUCCESS_OR_FATAL(cudaEventRecord(tree_split_event_, cuda_tree_stream_));
     cuda_data_partition_->Split(best_split_info,
                                 best_leaf_index_,
                                 right_leaf_index,

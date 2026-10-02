@@ -330,6 +330,14 @@ void CUDABestSplitFinder::FindBestSplitsForLeaf(
   const score_t* hess_scale,
   const uint8_t smaller_num_bits_in_histogram_bins,
   const uint8_t larger_num_bits_in_histogram_bins) {
+  if (tree_split_event_ != nullptr) {
+    // The tree split kernel (launched on the tree stream) reads the best split info of the leaf that was just
+    // split, which is overwritten below. Order the writers (the streams used by the kernels below, and the
+    // default stream) after it.
+    CUDASUCCESS_OR_FATAL(cudaStreamWaitEvent(cuda_streams_[0], tree_split_event_, 0));
+    CUDASUCCESS_OR_FATAL(cudaStreamWaitEvent(cuda_streams_[1], tree_split_event_, 0));
+    CUDASUCCESS_OR_FATAL(cudaStreamWaitEvent(nullptr, tree_split_event_, 0));
+  }
   const bool is_smaller_leaf_valid = (num_data_in_smaller_leaf > min_data_in_leaf_ &&
     sum_hessians_in_smaller_leaf > min_sum_hessian_in_leaf_ &&
     (max_depth_ <= 0 || smaller_leaf_depth < max_depth_));
