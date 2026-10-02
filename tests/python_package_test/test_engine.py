@@ -3874,6 +3874,7 @@ def test_cuda_extra_trees_can_be_enabled_after_training_starts():
         },
         train_set,
         num_boost_round=2,
+        keep_training_booster=True,
     )
     booster.reset_parameter({"extra_trees": True})
     booster.update()
