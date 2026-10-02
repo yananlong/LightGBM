@@ -1849,12 +1849,18 @@ void CUDABestSplitFinder::LaunchFindBestSplitsForLeafKernelInner2(LaunchFindBest
     }
   } else {
     if (is_smaller_leaf_valid) {
+      if (histogram_ready_event_ != nullptr) {
+        CUDASUCCESS_OR_FATAL(cudaStreamWaitEvent(cuda_streams_[0], histogram_ready_event_, 0));
+      }
       FindBestSplitsForLeafKernel_GlobalMemory<USE_RAND, USE_L1, USE_SMOOTHING, false>
         <<<num_tasks_, NUM_THREADS_PER_BLOCK_BEST_SPLIT_FINDER, 0, cuda_streams_[0]>>>
         (is_feature_used_by_smaller_node, FindBestSplitsForLeafKernel_ARGS, GlobalMemory_Buffer_ARGS);
     }
     SynchronizeCUDADevice(__FILE__, __LINE__);
     if (is_larger_leaf_valid) {
+      if (histogram_ready_event_ != nullptr) {
+        CUDASUCCESS_OR_FATAL(cudaStreamWaitEvent(cuda_streams_[1], histogram_ready_event_, 0));
+      }
       FindBestSplitsForLeafKernel_GlobalMemory<USE_RAND, USE_L1, USE_SMOOTHING, true>
         <<<num_tasks_, NUM_THREADS_PER_BLOCK_BEST_SPLIT_FINDER, 0, cuda_streams_[1]>>>
         (is_feature_used_by_larger_node, FindBestSplitsForLeafKernel_ARGS, GlobalMemory_Buffer_ARGS);
