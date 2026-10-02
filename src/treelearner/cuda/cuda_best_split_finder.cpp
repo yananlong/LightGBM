@@ -347,6 +347,9 @@ void CUDABestSplitFinder::FindBestSplitsForLeaf(
   global_timer.Start("CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel");
   LaunchSyncBestSplitForLeafKernel(smaller_leaf_index, larger_leaf_index, is_smaller_leaf_valid, is_larger_leaf_valid);
   if (!is_smaller_leaf_valid || !is_larger_leaf_valid) {
+    // FindBestFromAllSplits already waits on split_results_ready_event_, but
+    // removing this device-wide wait made CUDA metric-vs-predict tests fail
+    // nondeterministically (another stream still depends on it).
     SynchronizeCUDADevice(__FILE__, __LINE__);
   }
   global_timer.Stop("CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel");

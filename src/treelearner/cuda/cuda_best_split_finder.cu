@@ -2110,8 +2110,12 @@ void CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel(
   const int host_larger_leaf_index,
   const bool is_smaller_leaf_valid,
   const bool is_larger_leaf_valid) {
+  // With one valid leaf, consolidate on its producer stream so the result event
+  // covers split finding without relying on implicit default-stream ordering.
+  const cudaStream_t consolidation_stream = is_smaller_leaf_valid ? cuda_streams_[0] :
+    (is_larger_leaf_valid ? cuda_streams_[1] : nullptr);
   if (!is_smaller_leaf_valid || !is_larger_leaf_valid) {
-    SetInvalidLeafSplitInfoKernel<<<1, 1>>>(
+    SetInvalidLeafSplitInfoKernel<<<1, 1, 0, consolidation_stream>>>(
       cuda_leaf_best_split_info_.RawData(),
       is_smaller_leaf_valid, is_larger_leaf_valid,
       host_smaller_leaf_index, host_larger_leaf_index);
@@ -2172,7 +2176,7 @@ void CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel(
     CUDASUCCESS_OR_FATAL(cudaEventRecord(split_results_ready_event_, cuda_streams_[0]));
   } else {
     const bool larger_only = (!is_smaller_leaf_valid && is_larger_leaf_valid);
-    SyncBestSplitForLeafKernel<<<num_blocks_per_leaf, NUM_TASKS_PER_SYNC_BLOCK>>>(
+    SyncBestSplitForLeafKernel<<<num_blocks_per_leaf, NUM_TASKS_PER_SYNC_BLOCK, 0, consolidation_stream>>>(
       host_smaller_leaf_index,
       host_larger_leaf_index,
       cuda_leaf_best_split_info_.RawData(),
@@ -2184,8 +2188,8 @@ void CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel(
       larger_only,
       num_leaves_);
     if (num_blocks_per_leaf > 1) {
-      SynchronizeCUDADevice(__FILE__, __LINE__);
-      SyncBestSplitForLeafKernelAllBlocks<<<1, 1>>>(
+      // Both reduction stages share the producer stream, preserving their ordering.
+      SyncBestSplitForLeafKernelAllBlocks<<<1, 1, 0, consolidation_stream>>>(
         host_smaller_leaf_index,
         host_larger_leaf_index,
         num_blocks_per_leaf,
@@ -2193,7 +2197,7 @@ void CUDABestSplitFinder::LaunchSyncBestSplitForLeafKernel(
         cuda_leaf_best_split_info_.RawData(),
         larger_only);
     }
-    CUDASUCCESS_OR_FATAL(cudaEventRecord(split_results_ready_event_, nullptr));
+    CUDASUCCESS_OR_FATAL(cudaEventRecord(split_results_ready_event_, consolidation_stream));
   }
 }
 
