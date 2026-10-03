@@ -147,7 +147,7 @@ void CUDAGradientDiscretizer::DiscretizeGradients(
 
   if (nccl_communicator_ != nullptr) {
     SynchronizeCUDADevice(__FILE__, __LINE__);
-    cudaStream_t cuda_stream = CUDAStreamCreate();
+    cudaStream_t cuda_stream = NCCLCommunicatorStream(nccl_communicator_);
     NCCLGroupStart();
     NCCLAllReduce<score_t>(grad_min_block_buffer_.RawDataReadOnly(), grad_min_block_buffer_.RawData(), 1, ncclFloat32, ncclMin, nccl_communicator_, cuda_stream);
     NCCLAllReduce<score_t>(hess_min_block_buffer_.RawDataReadOnly(), hess_min_block_buffer_.RawData(), 1, ncclFloat32, ncclMin, nccl_communicator_, cuda_stream);
@@ -155,7 +155,6 @@ void CUDAGradientDiscretizer::DiscretizeGradients(
     NCCLAllReduce<score_t>(hess_max_block_buffer_.RawDataReadOnly(), hess_max_block_buffer_.RawData(), 1, ncclFloat32, ncclMax, nccl_communicator_, cuda_stream);
     NCCLGroupEnd();
     SynchronizeCUDAStream(cuda_stream, __FILE__, __LINE__);
-    CUDAStreamDestroy(cuda_stream);
   }
 
   #define DiscretizeGradientsKernel_ARGS \

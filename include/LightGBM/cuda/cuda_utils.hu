@@ -284,6 +284,21 @@ void NCCLGroupStart();
 
 void NCCLGroupEnd();
 
+/*!
+* \brief Returns a stream dedicated to collectives on a communicator.
+*        The stream is created on the communicator's own device the first time
+*        it is requested and stays alive until ReleaseNCCLCommunicatorStream().
+*        NCCL/RCCL remember the last user stream of each communicator and
+*        record events on it when the next collective is enqueued on a
+*        different stream, so a stream that was ever passed to a collective
+*        must not be destroyed while the communicator can still be used.
+*        Transient streams must therefore never be passed to collectives.
+*/
+cudaStream_t NCCLCommunicatorStream(ncclComm_t comm);
+
+/*! \brief Waits for and destroys the stream from NCCLCommunicatorStream(); the communicator must no longer be used. */
+void ReleaseNCCLCommunicatorStream(ncclComm_t comm);
+
 template <typename T>
 void NCCLAllReduce(const T* send_buffer, T* recv_buffer, size_t count, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm, cudaStream_t stream) {
   NCCLCHECK(ncclAllReduce(reinterpret_cast<const void*>(send_buffer), reinterpret_cast<void*>(recv_buffer), count, datatype, op, comm, stream));
@@ -291,11 +306,9 @@ void NCCLAllReduce(const T* send_buffer, T* recv_buffer, size_t count, ncclDataT
 
 template <typename T>
 void NCCLAllReduce(const T* send_buffer, T* recv_buffer, size_t count, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm) {
-  cudaStream_t nccl_stream;
-  CUDASUCCESS_OR_FATAL(cudaStreamCreate(&nccl_stream));
+  cudaStream_t nccl_stream = NCCLCommunicatorStream(comm);
   NCCLCHECK(ncclAllReduce(reinterpret_cast<const void*>(send_buffer), reinterpret_cast<void*>(recv_buffer), count, datatype, op, comm, nccl_stream));
   CUDASUCCESS_OR_FATAL(cudaStreamSynchronize(nccl_stream));
-  CUDASUCCESS_OR_FATAL(cudaStreamDestroy(nccl_stream));
 }
 
 template <typename T>
