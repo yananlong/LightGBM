@@ -5204,3 +5204,87 @@ def test_equal_predict_from_row_major_and_col_major_data():
     preds_col = bst.predict(X_col)
 
     np.testing.assert_allclose(preds_row, preds_col)
+
+
+@pytest.mark.skipif(not BuildInfo.has_cuda, reason="NCCL training path is only used by the CUDA version")
+def test_cuda_multi_gpu_repeated_updates():
+    """Regression test for NCCL/RCCL use-after-free of destroyed collective streams.
+
+    num_gpu=2 is clamped to the number of visible devices, so on a single-GPU machine this still
+    runs (without a second rank); with two or more devices it exercises the NCCL training path
+    for several iterations.
+    """
+    X, y = make_classification(n_samples=20_000, n_features=64, n_informative=16, random_state=714)
+    booster = lgb.train(
+        {
+            "objective": "binary",
+            "metric": "binary_logloss",
+            "device_type": "cuda",
+            "num_gpu": 2,
+            "max_bin": 63,
+            "num_leaves": 31,
+            "seed": 714,
+            "verbosity": -1,
+        },
+        lgb.Dataset(X, label=y),
+        num_boost_round=10,
+    )
+    probabilities = booster.predict(X)
+    assert np.isfinite(probabilities).all()
+    assert roc_auc_score(y, probabilities) > 0.7
+
+
+def _visible_cuda_device_count() -> int:
+    """Number of CUDA/ROCm devices visible to this process, or 0 if it cannot be determined."""
+    import ctypes
+
+    for lib_name, func_name in (
+        ("libcudart.so", "cudaGetDeviceCount"),
+        ("libcudart.so.13", "cudaGetDeviceCount"),
+        ("libcudart.so.12", "cudaGetDeviceCount"),
+        ("libcudart.so.11.0", "cudaGetDeviceCount"),
+        ("libamdhip64.so", "hipGetDeviceCount"),
+        ("libamdhip64.so.7", "hipGetDeviceCount"),
+        ("libamdhip64.so.6", "hipGetDeviceCount"),
+    ):
+        try:
+            count = ctypes.c_int(0)
+            if getattr(ctypes.CDLL(lib_name), func_name)(ctypes.byref(count)) == 0:
+                return count.value
+        except (OSError, AttributeError):
+            continue
+    return 0
+
+
+@pytest.mark.skipif(not BuildInfo.has_cuda, reason="Requires a CUDA build (TASK=cuda)")
+@pytest.mark.parametrize("num_local_rows", [0, 1])
+def test_cuda_multi_gpu_split_leaf_with_few_local_rows(num_local_rows):
+    # With num_gpu > 1 the rows are sharded across the GPUs (contiguous blocks) and splits are chosen from
+    # globally reduced histograms. A leaf can therefore hold only 0 or 1 of its rows on one GPU, and splitting it
+    # must still work on that GPU. Rows with x0 == 1 form one such leaf: all of them are in the second shard,
+    # except `num_local_rows` rows placed in the first one.
+    if _visible_cuda_device_count() < 2:
+        pytest.skip("Requires at least two CUDA devices")
+    rng = np.random.RandomState(0)
+    n_samples = 4000
+    X = rng.uniform(size=(n_samples, 3))
+    X[:, 0] = 0.0
+    X[n_samples // 2 :, 0] = 1.0
+    X[:num_local_rows, 0] = 1.0
+    y = 10.0 * X[:, 0] + 5.0 * X[:, 1] + 3.0 * X[:, 2] + 0.1 * rng.standard_normal(n_samples)
+    params = {
+        "objective": "regression",
+        "device_type": "cuda",
+        "num_gpu": 2,
+        "num_leaves": 8,
+        "learning_rate": 0.3,
+        "max_bin": 63,
+        "verbose": -1,
+        "seed": 0,
+    }
+    preds = lgb.train(params, lgb.Dataset(X, label=y), num_boost_round=5).predict(X)
+    assert np.isfinite(preds).all()
+    cpu_params = {**params, "device_type": "cpu"}
+    cpu_params.pop("num_gpu")
+    cpu_preds = lgb.train(cpu_params, lgb.Dataset(X, label=y), num_boost_round=5).predict(X)
+    np.testing.assert_allclose(preds, cpu_preds, atol=1e-3)

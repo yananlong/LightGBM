@@ -977,7 +977,7 @@ void CUDADataPartition::LaunchSplitInnerKernel(
   double* right_leaf_sum_of_gradients_ref,
   data_size_t* global_left_leaf_num_data,
   data_size_t* global_right_leaf_num_data) {
-  int num_blocks_final_ref = grid_dim_ - 1;
+  int num_blocks_final_ref = std::max(grid_dim_ - 1, 0);
   int num_blocks_final_aligned = 1;
   while (num_blocks_final_ref > 0) {
     num_blocks_final_aligned <<= 1;
@@ -1022,10 +1022,12 @@ void CUDADataPartition::LaunchSplitInnerKernel(
 
   global_timer.Start("CUDADataPartition::SplitInnerKernel");
   gpuAssert(cudaStreamWaitEvent(cuda_streams_[1], split_offsets_ready_event_, 0), __FILE__, __LINE__);
-  SplitInnerKernel<<<grid_dim_, block_dim_, 0, cuda_streams_[1]>>>(
-    left_leaf_index, right_leaf_index, cuda_leaf_data_start_.RawData(), cuda_leaf_num_data_.RawData(), cuda_data_indices_.RawData(),
-    cuda_block_data_to_left_offset_.RawData(), cuda_block_data_to_right_offset_.RawData(), cuda_block_to_left_offset_.RawData(),
-    cuda_out_data_indices_in_leaf_.RawData());
+  if (grid_dim_ > 0) {
+    SplitInnerKernel<<<grid_dim_, block_dim_, 0, cuda_streams_[1]>>>(
+      left_leaf_index, right_leaf_index, cuda_leaf_data_start_.RawData(), cuda_leaf_num_data_.RawData(), cuda_data_indices_.RawData(),
+      cuda_block_data_to_left_offset_.RawData(), cuda_block_data_to_right_offset_.RawData(), cuda_block_to_left_offset_.RawData(),
+      cuda_out_data_indices_in_leaf_.RawData());
+  }
   global_timer.Stop("CUDADataPartition::SplitInnerKernel");
   gpuAssert(cudaEventRecord(split_inner_ready_event_, cuda_streams_[1]), __FILE__, __LINE__);
 
@@ -1072,8 +1074,10 @@ void CUDADataPartition::LaunchSplitInnerKernel(
   global_timer.Start("CUDADataPartition::CopyDataIndicesKernel");
   gpuAssert(cudaStreamWaitEvent(cuda_streams_[2], split_inner_ready_event_, 0), __FILE__, __LINE__);
   gpuAssert(cudaStreamWaitEvent(cuda_streams_[2], data_index_to_leaf_index_ready_event_, 0), __FILE__, __LINE__);
-  CopyDataIndicesKernel<<<grid_dim_, block_dim_, 0, cuda_streams_[2]>>>(
-    left_leaf_num_data + right_leaf_num_data, cuda_out_data_indices_in_leaf_.RawData(), cuda_data_indices_.RawData() + left_leaf_data_start);
+  if (grid_dim_ > 0) {
+    CopyDataIndicesKernel<<<grid_dim_, block_dim_, 0, cuda_streams_[2]>>>(
+      left_leaf_num_data + right_leaf_num_data, cuda_out_data_indices_in_leaf_.RawData(), cuda_data_indices_.RawData() + left_leaf_data_start);
+  }
   gpuAssert(cudaEventRecord(data_indices_ready_event_, cuda_streams_[2]), __FILE__, __LINE__);
   data_indices_ready_ = true;
   global_timer.Stop("CUDADataPartition::CopyDataIndicesKernel");

@@ -199,25 +199,29 @@ void CUDADataPartition::GenDataToLeftBitVector(
     const data_size_t leaf_data_start,
     const int left_leaf_index,
     const int right_leaf_index) {
-  if (is_categorical_feature_[split_feature_index]) {
-    LaunchGenDataToLeftBitVectorCategoricalKernel(
-      num_data_in_leaf,
-      split_feature_index,
-      categorical_bitset,
-      categorical_bitset_len,
-      split_default_left,
-      leaf_data_start,
-      left_leaf_index,
-      right_leaf_index);
-  } else {
-    LaunchGenDataToLeftBitVectorKernel(
-      num_data_in_leaf,
-      split_feature_index,
-      split_threshold,
-      split_default_left,
-      leaf_data_start,
-      left_leaf_index,
-      right_leaf_index);
+  // grid_dim_ == 0: no local row in this leaf (possible with multiple GPUs), there is nothing to partition and a
+  // zero-size grid must not be launched. The event is still recorded so that the downstream waits keep their meaning.
+  if (grid_dim_ > 0) {
+    if (is_categorical_feature_[split_feature_index]) {
+      LaunchGenDataToLeftBitVectorCategoricalKernel(
+        num_data_in_leaf,
+        split_feature_index,
+        categorical_bitset,
+        categorical_bitset_len,
+        split_default_left,
+        leaf_data_start,
+        left_leaf_index,
+        right_leaf_index);
+    } else {
+      LaunchGenDataToLeftBitVectorKernel(
+        num_data_in_leaf,
+        split_feature_index,
+        split_threshold,
+        split_default_left,
+        leaf_data_start,
+        left_leaf_index,
+        right_leaf_index);
+    }
   }
   gpuAssert(cudaEventRecord(data_index_to_leaf_index_ready_event_, cuda_streams_[3]), __FILE__, __LINE__);
   data_index_to_leaf_index_ready_ = true;
@@ -278,10 +282,18 @@ void CUDADataPartition::UpdateTrainScore(const Tree* tree, double* scores, bool 
 }
 
 void CUDADataPartition::CalcBlockDim(const data_size_t num_data_in_leaf) {
+  if (num_data_in_leaf <= 0) {
+    // This rank holds no row of the leaf (possible with multiple GPUs, where leaves are split on global
+    // counts). Nothing has to be launched: grid_dim_ == 0 tells the callers to skip the per-row kernels.
+    grid_dim_ = 0;
+    block_dim_ = 1;
+    return;
+  }
   const int min_num_blocks = num_data_in_leaf <= 100 ? 1 : 80;
   const int num_blocks = std::max(min_num_blocks, (num_data_in_leaf + SPLIT_INDICES_BLOCK_SIZE_DATA_PARTITION - 1) / SPLIT_INDICES_BLOCK_SIZE_DATA_PARTITION);
+  // rows per block minus one; this is 0 when the leaf has a single row, which maps to one block of one thread
   int split_indices_block_size_data_partition = (num_data_in_leaf + num_blocks - 1) / num_blocks - 1;
-  CHECK_GT(split_indices_block_size_data_partition, 0);
+  CHECK_GE(split_indices_block_size_data_partition, 0);
   int split_indices_block_size_data_partition_aligned = 1;
   while (split_indices_block_size_data_partition > 0) {
     split_indices_block_size_data_partition_aligned <<= 1;
