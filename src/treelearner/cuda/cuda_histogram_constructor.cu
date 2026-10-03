@@ -760,6 +760,10 @@ __global__ void FixHistogramKernel(
   const hist_t bin_gradient = (threadIdx_x < num_bin && threadIdx_x != most_freq_bin) ? feature_hist[hist_pos] : 0.0f;
   const hist_t bin_hessian = (threadIdx_x < num_bin && threadIdx_x != most_freq_bin) ? feature_hist[hist_pos + 1] : 0.0f;
   const hist_t sum_gradient = ShuffleReduceSum<hist_t>(bin_gradient, shared_mem_buffer, num_bin_aligned);
+  // ShuffleReduceSum() leaves the per-warp partial sums in shared memory and
+  // warp 0 reads them after returning to the caller. Wait for it before the next
+  // reduction overwrites the same buffer.
+  __syncthreads();
   const hist_t sum_hessian = ShuffleReduceSum<hist_t>(bin_hessian, shared_mem_buffer, num_bin_aligned);
   if (threadIdx_x == 0) {
     feature_hist[most_freq_bin << 1] = leaf_sum_gradients - sum_gradient;
