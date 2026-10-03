@@ -5027,6 +5027,34 @@ def test_equal_predict_from_row_major_and_col_major_data():
     np.testing.assert_allclose(preds_row, preds_col)
 
 
+@pytest.mark.skipif(not BuildInfo.has_cuda, reason="NCCL training path is only used by the CUDA version")
+def test_cuda_multi_gpu_repeated_updates():
+    """Regression test for NCCL/RCCL use-after-free of destroyed collective streams.
+
+    num_gpu=2 is clamped to the number of visible devices, so on a single-GPU machine this still
+    runs (without a second rank); with two or more devices it exercises the NCCL training path
+    for several iterations.
+    """
+    X, y = make_classification(n_samples=20_000, n_features=64, n_informative=16, random_state=714)
+    booster = lgb.train(
+        {
+            "objective": "binary",
+            "metric": "binary_logloss",
+            "device_type": "cuda",
+            "num_gpu": 2,
+            "max_bin": 63,
+            "num_leaves": 31,
+            "seed": 714,
+            "verbosity": -1,
+        },
+        lgb.Dataset(X, label=y),
+        num_boost_round=10,
+    )
+    probabilities = booster.predict(X)
+    assert np.isfinite(probabilities).all()
+    assert roc_auc_score(y, probabilities) > 0.7
+
+
 def _visible_cuda_device_count() -> int:
     """Number of CUDA/ROCm devices visible to this process, or 0 if it cannot be determined."""
     import ctypes
